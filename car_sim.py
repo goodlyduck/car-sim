@@ -15,8 +15,8 @@ min_speed = 25
 max_speed = 25
 switch_loss = 300  # W
 
-road_gradient_profile_dist = [0, 0.5, 1, 1.5, 2, 2.5]  # km
-road_gradient_profile = [0, 0, -5, 0, 0, 0]  # degrees, positive is uphill
+road_gradient_profile_dist = [0, 0.99, 1, 1.99, 2, 2.5]  # km
+road_gradient_profile = [0, 0, -5, -5, 0, 0]  # degrees, positive is uphill
 road_gradient_function = interp1d(
     road_gradient_profile_dist,
     road_gradient_profile,
@@ -46,17 +46,16 @@ def get_road_load(road_gradient, speed):
 def get_driver_force(speed, road_load):
     if max_speed == min_speed:
         return road_load
-    elif speed > max_speed or speed < min_speed:
-        return road_load
+    elif speed > max_speed:
+        return road_load - 1
+    elif speed < min_speed:
+        return road_load + 1
     else:
         return 0
 
 
 def get_machine_power(speed, driver_force):
     return speed * driver_force / efficiency
-
-
-# print(get_road_load(0, 10))
 
 
 def sim():
@@ -68,6 +67,8 @@ def sim():
     time = 0
     road_gradient = 0
     road_load = 0
+    driver_force = 0
+    elevation = 0
 
     speeds = [speed]
     energies = [0]
@@ -77,6 +78,7 @@ def sim():
     road_loads = [0]
     driver_forces = [0]
     switching_energies = [0]
+    elevations = [0]
 
     while distance < simulation_distance and time < simulation_max_time and speed > 0.1:
         road_gradient = get_road_gradient(distance)
@@ -96,6 +98,8 @@ def sim():
 
         time += time_step
 
+        elevation += np.arctan(road_gradient) * speed * time_step
+
         speeds.append(speed)
         energies.append(energy)
         distances.append(distance)
@@ -104,6 +108,7 @@ def sim():
         road_loads.append(road_load)
         driver_forces.append(driver_force)
         switching_energies.append(switching_energy)
+        elevations.append(elevation)
 
     return (
         speeds,
@@ -114,6 +119,7 @@ def sim():
         road_loads,
         driver_forces,
         switching_energies,
+        elevations,
     )
 
 
@@ -127,12 +133,15 @@ def sim():
     road_loads,
     driver_forces,
     switching_energies,
+    elevations,
 ) = sim()
 
 # Convert for plot
 # energies2 = np.array(energies) / (3600 * 1000)  # J -> kWh
 energies2 = [x / (3600 * 1000) for x in energies]
 switching_energies = np.array(switching_energies) / (3600 * 1000)  # J -> kWh
+
+print("Energy consumption: " + str(energies2[-1]) + " kWh")
 
 plt.figure(figsize=(17, 10))
 
@@ -176,6 +185,12 @@ plt.subplot(4, 2, 7)
 plt.plot(times, switching_energies)
 plt.xlabel("Time (s)")
 plt.ylabel("Switching Energy (kWh)")
+plt.grid()
+
+plt.subplot(4, 2, 8)
+plt.plot(times, elevations)
+plt.xlabel("Time (s)")
+plt.ylabel("Elevation (m)")
 plt.grid()
 
 plt.tight_layout()

@@ -1,0 +1,9 @@
+{
+    "XC40": {
+        "mass": 2100,
+        "drag_coefficient": 0.34,
+        "frontal_area": 2.56,
+        "efficiency": 0.9,
+        "switch_loss": 300
+    }
+}

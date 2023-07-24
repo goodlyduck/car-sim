@@ -1,28 +1,57 @@
 import numpy as np
+from pathlib import Path
 import matplotlib.pyplot as plt
+import json
 from scipy.interpolate import interp1d
 
-mass = 2100  # kg
-drag_coefficient = 0.34  # XC40
-frontal_area = 2.56  # m^2, XC40
-gravity = 9.81  # m/s^2
-efficiency = 0.9
-time_step = 0.01  # seconds
-simulation_distance = 3000  # m
-simulation_max_time = 1000  # s
-initial_speed = 25  # m/s
-min_speed = 25
-max_speed = 25
-switch_loss = 300  # W
+vehicle = "XC40"
+# environment = "flat_downhill_flat"
+environment = "flat_downhill_uphill_flat"
+simulation = "constant_speed"
+# simulation = "allow_overshoot"
+# simulation = "allow_small_overshoot"
 
-road_gradient_profile_dist = [0, 0.99, 1, 1.99, 2, 2.5]  # km
-road_gradient_profile = [0, 0, -5, -5, 0, 0]  # degrees, positive is uphill
+
+p = Path(__file__).with_name("vehicles.json")
+with p.open("r") as f:
+    vehicle_config = json.load(f).get(vehicle)
+p = Path(__file__).with_name("simulations.json")
+with p.open("r") as f:
+    simulation_config = json.load(f).get(simulation)
+p = Path(__file__).with_name("environments.json")
+with p.open("r") as f:
+    environment_config = json.load(f).get(environment)
+
+gravity = 9.81
+
+road_gradient_profile_distance = environment_config[
+    "road_gradient_profile_distance"
+]  # km
+road_gradient_profile = environment_config[
+    "road_gradient_profile"
+]  # degrees, positive is uphill
+
 road_gradient_function = interp1d(
-    road_gradient_profile_dist,
+    road_gradient_profile_distance,
     road_gradient_profile,
     kind="linear",
     fill_value="extrapolate",
 )
+
+mass = vehicle_config["mass"]
+drag_coefficient = vehicle_config["drag_coefficient"]
+frontal_area = vehicle_config["frontal_area"]
+efficiency = vehicle_config["efficiency"]
+switch_loss = vehicle_config["switch_loss"]  # W
+
+time_step = simulation_config["time_step"]
+max_distance = min(
+    simulation_config["max_distance"], road_gradient_profile_distance[-1] * 1000
+)
+max_time = simulation_config["max_time"]
+initial_speed = simulation_config["initial_speed"]
+min_speed = simulation_config["min_speed"]
+max_speed = simulation_config["max_speed"]
 
 
 def get_road_gradient(distance):
@@ -80,7 +109,7 @@ def sim():
     switching_energies = [0]
     elevations = [0]
 
-    while distance < simulation_distance and time < simulation_max_time and speed > 0.1:
+    while distance < max_distance and time < max_time and speed > 0.1:
         road_gradient = get_road_gradient(distance)
         road_load = get_road_load(road_gradient, speed)
         driver_force = get_driver_force(speed, road_load)
@@ -98,7 +127,7 @@ def sim():
 
         time += time_step
 
-        elevation += np.arctan(road_gradient) * speed * time_step
+        elevation += np.arctan(road_gradient * np.pi / 180) * speed * time_step
 
         speeds.append(speed)
         energies.append(energy)
@@ -123,7 +152,7 @@ def sim():
     )
 
 
-# Run simulation
+# Run simulation_config
 (
     speeds,
     energies,
@@ -148,19 +177,19 @@ plt.figure(figsize=(17, 10))
 plt.subplot(4, 2, 1)
 plt.plot(times, gradients)
 plt.xlabel("Time (s)")
-plt.ylabel("Road Gradient (degrees)")
+plt.ylabel("Road Gradient (deg)")
 plt.grid()
 
 plt.subplot(4, 2, 2)
 plt.plot(times, speeds)
 plt.xlabel("Time (s)")
-plt.ylabel("Vehicle Speed (m/s)")
+plt.ylabel("vehicle Speed (m/s)")
 plt.grid()
 
 plt.subplot(4, 2, 3)
 plt.plot(times, energies2)
 plt.xlabel("Time (s)")
-plt.ylabel("Consumed Energy (kWh)")
+plt.ylabel("Total Energy (kWh)")
 plt.grid()
 
 plt.subplot(4, 2, 4)

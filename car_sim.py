@@ -90,7 +90,7 @@ def sim():
         machine_energy += get_machine_power(speed, driver_force) * time_step
         if abs(driver_force) > 0.1:
             switching_energy += switch_loss * time_step
-        energy += machine_energy + switching_energy
+        energy = machine_energy + switching_energy
 
         distance += speed * time_step
 

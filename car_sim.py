@@ -1,17 +1,31 @@
 import numpy as np
+import datetime
 from pathlib import Path
 import matplotlib.pyplot as plt
 import json
 from scipy.interpolate import interp1d
 
+############################################
+# Select vehicle, environment and scenario
+############################################
 vehicle = "XC40"
 # environment = "flat_downhill_flat"
 environment = "flat_downhill_uphill_flat"
 simulation = "constant_speed"
+# simulation = "constant_speed_low_speed"
 # simulation = "allow_overshoot"
 # simulation = "allow_small_overshoot"
+# simulation = "allow_small_overshoot_low_speed"
 
+############################################
+# Global constants
+############################################
+gravity = 9.81
+time_step = 0.01
 
+############################################
+# Open and read config files
+############################################
 p = Path(__file__).with_name("vehicles.json")
 with p.open("r") as f:
     vehicle_config = json.load(f).get(vehicle)
@@ -22,8 +36,9 @@ p = Path(__file__).with_name("environments.json")
 with p.open("r") as f:
     environment_config = json.load(f).get(environment)
 
-gravity = 9.81
-
+############################################
+# Assign parameters from config
+############################################
 road_gradient_profile_distance = environment_config[
     "road_gradient_profile_distance"
 ]  # km
@@ -44,7 +59,6 @@ frontal_area = vehicle_config["frontal_area"]
 efficiency = vehicle_config["efficiency"]
 switch_loss = vehicle_config["switch_loss"]  # W
 
-time_step = simulation_config["time_step"]
 max_distance = min(
     simulation_config["max_distance"], road_gradient_profile_distance[-1] * 1000
 )
@@ -53,7 +67,9 @@ initial_speed = simulation_config["initial_speed"]
 min_speed = simulation_config["min_speed"]
 max_speed = simulation_config["max_speed"]
 
-
+############################################
+# Define functions
+############################################
 def get_road_gradient(distance):
     """
     Output: road gradient (rad)
@@ -75,9 +91,9 @@ def get_road_load(road_gradient, speed):
 def get_driver_force(speed, road_load):
     if max_speed == min_speed:
         return road_load
-    elif speed > max_speed:
+    elif speed > max_speed and road_load < 0:
         return road_load - 1
-    elif speed < min_speed:
+    elif speed < min_speed and road_load > 0:
         return road_load + 1
     else:
         return 0
@@ -151,8 +167,9 @@ def sim():
         elevations,
     )
 
-
-# Run simulation_config
+############################################
+# Run simulation
+############################################
 (
     speeds,
     energies,
@@ -165,12 +182,16 @@ def sim():
     elevations,
 ) = sim()
 
+############################################
+# Plot and print
+############################################
 # Convert for plot
 # energies2 = np.array(energies) / (3600 * 1000)  # J -> kWh
 energies2 = [x / (3600 * 1000) for x in energies]
 switching_energies = np.array(switching_energies) / (3600 * 1000)  # J -> kWh
 
-print("Energy consumption: " + str(energies2[-1]) + " kWh")
+result_string = "Energy consumption: " + str(energies2[-1]) + " kWh"
+print(result_string)
 
 plt.figure(figsize=(17, 10))
 
@@ -223,4 +244,23 @@ plt.ylabel("Elevation (m)")
 plt.grid()
 
 plt.tight_layout()
+
+############################################
+# Save result
+############################################
+
+current_datetime = datetime.datetime.now()
+date_time_string = current_datetime.strftime("%Y-%m-%d %H_%M_%S")
+
+p = Path(__file__).with_name(date_time_string + ".png")
+plt.savefig(p)
+
+p = Path(__file__).with_name(date_time_string + ".txt")
+with open(p, 'w') as file:
+    file.write(result_string + "\n" + vehicle + "\n" + simulation + "\n" + environment + "\n")
+
+############################################
+# Show plot
+############################################
+
 plt.show()

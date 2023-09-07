@@ -1,14 +1,19 @@
 {
     "constant_speed": {
-        "time_step": 0.01,
         "max_distance": 3000,
         "max_time": 10000,
         "initial_speed": 25,
         "min_speed": 25,
         "max_speed": 25
     },
+    "constant_speed_low_speed": {
+        "max_distance": 3000,
+        "max_time": 10000,
+        "initial_speed": 5,
+        "min_speed": 5,
+        "max_speed": 5
+    },
     "allow_overshoot": {
-        "time_step": 0.01,
         "max_distance": 3000,
         "max_time": 10000,
         "initial_speed": 25,
@@ -16,11 +21,26 @@
         "max_speed": 200
     },
     "allow_small_overshoot": {
-        "time_step": 0.01,
         "max_distance": 3000,
         "max_time": 10000,
         "initial_speed": 25,
         "min_speed": 25,
         "max_speed": 26
+    },
+    "allow_small_overshoot_low_speed": {
+        "max_distance": 3000,
+        "max_time": 10000,
+        "initial_speed": 5,
+        "min_speed": 5,
+        "max_speed": 7
+    },
+    "speed_profile": {
+        "max_distance": 3000,
+        "max_time": 10000,
+        "initial_speed": 25,
+        "min_speed": 25,
+        "max_speed": 26,
+        "target_speed_distance": [1, 2, 3, 4, 5, 6, 7, 8],
+        "target_speed": [50, 50, 50, 50, 50, 50, 50, 50]
     }
 }

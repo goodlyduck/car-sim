@@ -38,5 +38,15 @@
             0,
             0
         ]
+    },
+    "flat": {
+        "road_gradient_profile_distance": [
+            0,
+            2
+        ],
+        "road_gradient_profile": [
+            0,
+            0
+        ]
     }
 }

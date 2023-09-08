@@ -10,8 +10,10 @@ from scipy.interpolate import interp1d
 ############################################
 vehicle = "XC40"
 # environment = "flat_downhill_flat"
-environment = "flat_downhill_uphill_flat"
-simulation = "constant_speed"
+# environment = "flat_downhill_uphill_flat"
+environment = "flat"
+simulation = "stop_brake_early"
+# simulation = "stop_brake_late"
 # simulation = "constant_speed_low_speed"
 # simulation = "allow_overshoot"
 # simulation = "allow_small_overshoot"
@@ -22,6 +24,15 @@ simulation = "constant_speed"
 ############################################
 gravity = 9.81
 time_step = 0.01
+driver_force_filt_const = 0.05
+
+############################################
+# Global variables
+############################################
+driver_force = 0
+driver_integral = 0
+driver_integral_gain = 10
+driver_propotional_gain = 10000
 
 ############################################
 # Open and read config files
@@ -45,7 +56,6 @@ road_gradient_profile_distance = environment_config[
 road_gradient_profile = environment_config[
     "road_gradient_profile"
 ]  # degrees, positive is uphill
-
 road_gradient_function = interp1d(
     road_gradient_profile_distance,
     road_gradient_profile,
@@ -60,22 +70,56 @@ efficiency = vehicle_config["efficiency"]
 switch_loss = vehicle_config["switch_loss"]  # W
 
 max_distance = min(
-    simulation_config["max_distance"], road_gradient_profile_distance[-1] * 1000
+    simulation_config["max_distance"] * 1000, road_gradient_profile_distance[-1] * 1000
 )
 max_time = simulation_config["max_time"]
-initial_speed = simulation_config["initial_speed"]
-min_speed = simulation_config["min_speed"]
-max_speed = simulation_config["max_speed"]
+initial_speed = simulation_config["initial_speed"] / 3.6
+
+min_speed_profile = simulation_config["min_speed"]
+min_speed_distance = simulation_config["min_speed_distance"]    #km 
+if isinstance(min_speed_profile,(list)):
+    min_speed_function = interp1d(
+        simulation_config["min_speed_distance"],    #km
+        simulation_config["min_speed"],
+        kind="linear",
+        fill_value="extrapolate",
+    )
+else:
+    def min_speed_function(x):
+        return np.array(min_speed_profile)
+
+max_speed_profile = simulation_config["max_speed"]
+max_speed_distance = simulation_config["max_speed_distance"]    #km
+if isinstance(max_speed_profile,(list)):
+    max_speed_function = interp1d(
+        max_speed_distance,
+        max_speed_profile,
+        kind="linear",
+        fill_value="extrapolate",
+    )
+else:
+    def max_speed_function(x):
+        return np.array(max_speed_profile)
+
 
 ############################################
 # Define functions
 ############################################
+def LP(new_value, prev_value, filter_constant):
+    global time_step
+    return time_step / max(filter_constant, time_step) * (new_value - prev_value) + prev_value
+
 def get_road_gradient(distance):
     """
     Output: road gradient (rad)
     Input: distance (m)"""
-    return road_gradient_function(distance / 1000)
+    return road_gradient_function(distance / 1000).item()
 
+def get_max_speed(distance):
+    return max_speed_function(distance/1000).item() / 3.6
+
+def get_min_speed(distance):
+    return min_speed_function(distance/1000).item() / 3.6
 
 def get_road_load(road_gradient, speed):
     """
@@ -87,110 +131,124 @@ def get_road_load(road_gradient, speed):
     rolling_resistance_force = 300
     return air_resistance_force + rolling_resistance_force + road_gradient_force
 
-
-def get_driver_force(speed, road_load):
-    if max_speed == min_speed:
-        return road_load
-    elif speed > max_speed and road_load < 0:
-        return road_load - 1
-    elif speed < min_speed and road_load > 0:
-        return road_load + 1
+"""
+def get_driver_force(speed, road_load, speed_max, speed_min):
+    global driver_propotional_gain
+    global driver_integral_gain
+    global driver_integral
+    if speed_max == speed_min:
+        force = road_load
+    elif speed > speed_max:
+        driver_integral += driver_integral_gain * (speed_max - speed)
+        force = driver_integral + driver_propotional_gain * (speed_max - speed)
+    elif speed < speed_min:
+        driver_integral += driver_integral_gain * (speed_min - speed)
+        force = driver_integral + driver_propotional_gain * (speed_min - speed)
     else:
-        return 0
+        driver_integral = max(0, abs(driver_integral)) - 1 * np.sign(driver_integral)
+        force = driver_integral
+    return force
+"""
+
+def get_driver_force(speed, road_load, speed_max, speed_min, prev_force):
+    global driver_integral
+    global driver_integral_gain
+    global driver_propotional_gain
+    global driver_force_filt_const
+
+    if speed <= speed_min:
+        force = road_load + driver_propotional_gain * (speed_min - speed)
+    elif speed >= speed_max:
+        force = road_load + driver_propotional_gain * (speed_max - speed)
+    else:
+        force = 0
+    force_filt = LP(force, prev_force, driver_force_filt_const)
+    return force_filt
 
 
 def get_machine_power(speed, driver_force):
     return speed * driver_force / efficiency
 
 
-def sim():
-    speed = initial_speed
-    energy = 0
-    machine_energy = 0
-    switching_energy = 0
-    distance = 0
-    time = 0
-    road_gradient = 0
-    road_load = 0
-    driver_force = 0
-    elevation = 0
-
-    speeds = [speed]
-    energies = [0]
-    distances = [0]
-    times = [0]
-    gradients = [0]
-    road_loads = [0]
-    driver_forces = [0]
-    switching_energies = [0]
-    elevations = [0]
-
-    while distance < max_distance and time < max_time and speed > 0.1:
-        road_gradient = get_road_gradient(distance)
-        road_load = get_road_load(road_gradient, speed)
-        driver_force = get_driver_force(speed, road_load)
-        net_force = driver_force - road_load
-
-        acceleration = net_force / mass
-        speed += acceleration * time_step
-
-        machine_energy += get_machine_power(speed, driver_force) * time_step
-        if abs(driver_force) > 0.1:
-            switching_energy += switch_loss * time_step
-        energy = machine_energy + switching_energy
-
-        distance += speed * time_step
-
-        time += time_step
-
-        elevation += np.arctan(road_gradient * np.pi / 180) * speed * time_step
-
-        speeds.append(speed)
-        energies.append(energy)
-        distances.append(distance)
-        times.append(time)
-        gradients.append(road_gradient)
-        road_loads.append(road_load)
-        driver_forces.append(driver_force)
-        switching_energies.append(switching_energy)
-        elevations.append(elevation)
-
-    return (
-        speeds,
-        energies,
-        distances,
-        times,
-        gradients,
-        road_loads,
-        driver_forces,
-        switching_energies,
-        elevations,
-    )
-
 ############################################
 # Run simulation
 ############################################
-(
-    speeds,
-    energies,
-    distances,
-    times,
-    gradients,
-    road_loads,
-    driver_forces,
-    switching_energies,
-    elevations,
-) = sim()
+
+speed = initial_speed
+energy = 0
+machine_energy = 0
+switching_energy = 0
+distance = 0
+time = 0
+road_gradient = 0
+road_load = 0
+driver_force = 0
+elevation = 0
+
+speeds = []
+max_speeds = []
+min_speeds = []
+battery_energies = []
+distances = []
+times = []
+gradients = []
+road_loads = []
+driver_forces = []
+switching_energies = []
+elevations = []
+
+# Initialize driver integral
+road_gradient = get_road_gradient(distance)
+road_load = get_road_load(road_gradient, speed)
+driver_integral = road_load
+
+while distance < max_distance and time < max_time and speed > 0.1:
+    road_gradient = get_road_gradient(distance)
+    road_load = get_road_load(road_gradient, speed)
+    max_speed = get_max_speed(distance)
+    min_speed = get_min_speed(distance)
+    driver_force = get_driver_force(speed, road_load, max_speed, min_speed, driver_force)
+    net_force = driver_force - road_load
+
+    acceleration = net_force / mass
+    speed += acceleration * time_step
+
+    machine_energy += get_machine_power(speed, driver_force) * time_step
+    if abs(driver_force) > 0.1:
+        switching_energy += switch_loss * time_step
+    battery_energy = machine_energy + switching_energy
+
+    distance += speed * time_step
+
+    time += time_step
+
+    elevation += np.arctan(road_gradient * np.pi / 180) * speed * time_step
+
+    if elevation < -1:
+        hej = "debug"
+
+    speeds.append(speed * 3.6)
+    max_speeds.append(max_speed * 3.6)
+    min_speeds.append(min_speed * 3.6)
+    battery_energies.append(battery_energy)
+    distances.append(distance)
+    times.append(time)
+    gradients.append(road_gradient)
+    road_loads.append(road_load)
+    driver_forces.append(driver_force)
+    switching_energies.append(switching_energy)
+    elevations.append(elevation)
+
 
 ############################################
 # Plot and print
 ############################################
 # Convert for plot
 # energies2 = np.array(energies) / (3600 * 1000)  # J -> kWh
-energies2 = [x / (3600 * 1000) for x in energies]
+energies2 = [x / (3600 * 1000) for x in battery_energies]
 switching_energies = np.array(switching_energies) / (3600 * 1000)  # J -> kWh
 
-result_string = "Energy consumption: " + str(energies2[-1]) + " kWh"
+result_string = "Battery energy consumption: " + str(energies2[-1]) + " kWh"
 print(result_string)
 
 plt.figure(figsize=(17, 10))
@@ -203,14 +261,16 @@ plt.grid()
 
 plt.subplot(4, 2, 2)
 plt.plot(times, speeds)
+plt.plot(times, max_speeds, linestyle='--')
+plt.plot(times, min_speeds, linestyle='--')
 plt.xlabel("Time (s)")
-plt.ylabel("vehicle Speed (m/s)")
+plt.ylabel("vehicle Speed (km/h)")
 plt.grid()
 
 plt.subplot(4, 2, 3)
 plt.plot(times, energies2)
 plt.xlabel("Time (s)")
-plt.ylabel("Total Energy (kWh)")
+plt.ylabel("Battery Energy (kWh)")
 plt.grid()
 
 plt.subplot(4, 2, 4)

@@ -66,7 +66,7 @@ road_gradient_function = interp1d(
 mass = vehicle_config["mass"]
 drag_coefficient = vehicle_config["drag_coefficient"]
 frontal_area = vehicle_config["frontal_area"]
-efficiency = vehicle_config["efficiency"]
+machine_efficiency = vehicle_config["machine_efficiency"]
 switch_loss = vehicle_config["switch_loss"]  # W
 
 max_distance = min(
@@ -167,7 +167,7 @@ def get_driver_force(speed, road_load, speed_max, speed_min, prev_force):
 
 
 def get_machine_power(speed, driver_force):
-    return speed * driver_force / efficiency
+    return speed * driver_force / machine_efficiency
 
 
 ############################################
@@ -184,6 +184,8 @@ road_gradient = 0
 road_load = 0
 driver_force = 0
 elevation = 0
+battery_power = 0
+battery_energy = 0
 
 speeds = []
 max_speeds = []
@@ -196,6 +198,7 @@ road_loads = []
 driver_forces = []
 switching_energies = []
 elevations = []
+battery_powers = []
 
 # Initialize driver integral
 road_gradient = get_road_gradient(distance)
@@ -210,14 +213,22 @@ while distance < max_distance and time < max_time and speed > 0.1:
     driver_force = get_driver_force(speed, road_load, max_speed, min_speed, driver_force)
     net_force = driver_force - road_load
 
+    # Power
+    machine_power = get_machine_power(speed, driver_force)
+    if abs(driver_force) > 0.1:
+        switching_power = switch_loss
+    else:
+        switching_power = 0
+    
+    # Energy
+    machine_energy += (machine_power + switching_power) * time_step
+    switching_energy += switching_power * time_step
+    battery_power = machine_power + switching_power
+    battery_energy += battery_power * time_step
+
+    # Vehicle movement
     acceleration = net_force / mass
     speed += acceleration * time_step
-
-    machine_energy += get_machine_power(speed, driver_force) * time_step
-    if abs(driver_force) > 0.1:
-        switching_energy += switch_loss * time_step
-    battery_energy = machine_energy + switching_energy
-
     distance += speed * time_step
 
     time += time_step
@@ -230,6 +241,7 @@ while distance < max_distance and time < max_time and speed > 0.1:
     speeds.append(speed * 3.6)
     max_speeds.append(max_speed * 3.6)
     min_speeds.append(min_speed * 3.6)
+    battery_powers.append(battery_power)
     battery_energies.append(battery_energy)
     distances.append(distance)
     times.append(time)
@@ -245,21 +257,22 @@ while distance < max_distance and time < max_time and speed > 0.1:
 ############################################
 # Convert for plot
 # energies2 = np.array(energies) / (3600 * 1000)  # J -> kWh
-energies2 = [x / (3600 * 1000) for x in battery_energies]
+battery_energies_plot = [x / (3600 * 1000) for x in battery_energies]   # J -> kWh
+battery_powers_plot = [x / 1000 for x in battery_powers]    # W -> kW
 switching_energies = np.array(switching_energies) / (3600 * 1000)  # J -> kWh
 
-result_string = "Battery energy consumption: " + str(energies2[-1]) + " kWh"
+result_string = "Battery energy consumption: " + str(battery_energies_plot[-1]) + " kWh"
 print(result_string)
 
 plt.figure(figsize=(17, 10))
 
-plt.subplot(4, 2, 1)
+plt.subplot(4, 3, 1)
 plt.plot(times, gradients)
 plt.xlabel("Time (s)")
 plt.ylabel("Road Gradient (deg)")
 plt.grid()
 
-plt.subplot(4, 2, 2)
+plt.subplot(4, 3, 2)
 plt.plot(times, speeds)
 plt.plot(times, max_speeds, linestyle='--')
 plt.plot(times, min_speeds, linestyle='--')
@@ -267,40 +280,46 @@ plt.xlabel("Time (s)")
 plt.ylabel("vehicle Speed (km/h)")
 plt.grid()
 
-plt.subplot(4, 2, 3)
-plt.plot(times, energies2)
+plt.subplot(4, 3, 3)
+plt.plot(times, battery_energies_plot)
 plt.xlabel("Time (s)")
 plt.ylabel("Battery Energy (kWh)")
 plt.grid()
 
-plt.subplot(4, 2, 4)
+plt.subplot(4, 3, 4)
 plt.plot(times, distances)
 plt.xlabel("Time (s)")
 plt.ylabel("Distance Traveled (m)")
 plt.grid()
 
-plt.subplot(4, 2, 5)
+plt.subplot(4, 3, 5)
 plt.plot(times, road_loads)
 plt.xlabel("Time (s)")
 plt.ylabel("Road Load (N)")
 plt.grid()
 
-plt.subplot(4, 2, 6)
+plt.subplot(4, 3, 6)
 plt.plot(times, driver_forces)
 plt.xlabel("Time (s)")
 plt.ylabel("Driver Force (N)")
 plt.grid()
 
-plt.subplot(4, 2, 7)
+plt.subplot(4, 3, 7)
 plt.plot(times, switching_energies)
 plt.xlabel("Time (s)")
 plt.ylabel("Switching Energy (kWh)")
 plt.grid()
 
-plt.subplot(4, 2, 8)
+plt.subplot(4, 3, 8)
 plt.plot(times, elevations)
 plt.xlabel("Time (s)")
 plt.ylabel("Elevation (m)")
+plt.grid()
+
+plt.subplot(4, 3, 9)
+plt.plot(times, battery_powers_plot)
+plt.xlabel("Time (s)")
+plt.ylabel("Battery Power (kW)")
 plt.grid()
 
 plt.tight_layout()

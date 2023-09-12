@@ -3,7 +3,8 @@
         "mass": 2100,
         "drag_coefficient": 0.34,
         "frontal_area": 2.56,
-        "efficiency": 0.9,
-        "switch_loss": 300
+        "machine_efficiency": 0.9,
+        "switch_loss": 300,
+        "battery_resistance": 0.0005
     }
 }

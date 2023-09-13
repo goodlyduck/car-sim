@@ -236,7 +236,7 @@ while distance < max_distance and time < max_time and speed > 0.1:
     else:
         switching_power = 0
     battery_power = max(machine_power + switching_power, min_battery_power)     # Friction fillin braking assumed
-    
+
     # Energy
     machine_energy += (machine_power + switching_power) * time_step
     switching_energy += switching_power * time_step
@@ -281,7 +281,11 @@ battery_energies_plot = [x / (3600 * 1000) for x in battery_energies]   # J -> k
 battery_powers_plot = [x / 1000 for x in battery_powers]    # W -> kW
 switching_energies = np.array(switching_energies) / (3600 * 1000)  # J -> kWh
 
+average_speed = (distances[-1] / 1000) / (times[-1] / 3600)
+
 result_string = "Battery energy consumption: " + str(battery_energies_plot[-1]) + " kWh"
+average_speed_string = "Average speed: " + str(average_speed * 3.6) + " km/h"
+print(average_speed_string)
 print(result_string)
 
 plt.figure(figsize=(17, 10))
@@ -356,7 +360,7 @@ plt.savefig(p)
 
 p = Path(__file__).with_name(date_time_string + ".txt")
 with open(p, 'w') as file:
-    file.write(result_string + "\n" + config_selection["vehicle"] + 
+    file.write(average_speed_string + "\n" + result_string + "\n" + config_selection["vehicle"] + 
                "\n" + config_selection["simulation"] + "\n" + config_selection["environment"] + "\n")
 
 ############################################

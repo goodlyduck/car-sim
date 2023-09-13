@@ -1,5 +1,6 @@
 import numpy as np
 import datetime
+from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
 import json
@@ -205,6 +206,9 @@ road_gradient = get_road_gradient(distance)
 road_load = get_road_load(road_gradient, speed)
 driver_integral = road_load
 
+print("Total distance: " + str(max_distance/1000) + " km")
+progress_bar = tqdm(total=max_distance, desc="Driven distance")
+
 while distance < max_distance and time < max_time and speed > 0.1:
     road_gradient = get_road_gradient(distance)
     road_load = get_road_load(road_gradient, speed)
@@ -229,7 +233,8 @@ while distance < max_distance and time < max_time and speed > 0.1:
     # Vehicle movement
     acceleration = net_force / mass
     speed += acceleration * time_step
-    distance += speed * time_step
+    distance_step = speed * time_step
+    distance += distance_step
 
     time += time_step
 
@@ -251,6 +256,9 @@ while distance < max_distance and time < max_time and speed > 0.1:
     switching_energies.append(switching_energy)
     elevations.append(elevation)
 
+    progress_bar.update(distance_step)
+
+progress_bar.close()
 
 ############################################
 # Plot and print

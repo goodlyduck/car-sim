@@ -59,18 +59,6 @@ for file_path in config_files:
     # Store the JSON data in the dictionary
     config_data[file_name] = data
 
-"""
-p = Path(__file__).with_name("vehicles.json")
-with p.open("r") as f:
-    vehicle_config = json.load(f).get(vehicle)
-p = Path(__file__).with_name("simulations.json")
-with p.open("r") as f:
-    simulation_config = json.load(f).get(simulation)
-p = Path(__file__).with_name("environments.json")
-with p.open("r") as f:
-    environment_config = json.load(f).get(environment)
-"""
-
 ############################################
 # Assign parameters from config
 ############################################
@@ -88,6 +76,15 @@ drag_coefficient = config_data["vehicle"]["drag_coefficient"]
 frontal_area = config_data["vehicle"]["frontal_area"]
 machine_efficiency = config_data["machine"]["efficiency"]
 switch_loss = config_data["machine"]["switch_loss"]  # W
+wheel_radius = config_data["vehicle"]["wheel_radius"]
+wheel_circm = wheel_radius * 2 * np.pi
+gear_ratio = config_data["machine"]["gear_ratio"]
+max_machine_torque = config_data["machine"]["max_torque"]
+max_machine_mech_power = config_data["machine"]["max_mech_power"] * 1000    # W
+min_machine_torque = config_data["machine"]["min_torque"]
+min_machine_mech_power = config_data["machine"]["min_mech_power"] * 1000    # W
+max_battery_power = config_data["battery"]["max_power"] * 1000    # W
+min_battery_power = config_data["battery"]["min_power"] * 1000    # W
 
 max_distance = min(
     config_data["simulation"]["max_distance"] * 1000, road_gradient_profile_distance[-1] * 1000
@@ -125,6 +122,18 @@ else:
 ############################################
 # Define functions
 ############################################
+def get_max_force(speed):
+    # Add battery power here later (with machine efficiency)
+    max_wheel_torque = min(max_machine_torque * gear_ratio, max_machine_mech_power / (speed / wheel_circm * np.pi))
+    max_force = max_wheel_torque / wheel_radius
+    return max_force
+
+def get_min_force(speed):
+    # Add battery power here later (with machine efficiency)
+    min_wheel_torque = max(min_machine_torque * gear_ratio, min_machine_mech_power / (speed / wheel_circm * np.pi))
+    min_force = min_wheel_torque / wheel_radius
+    return min_force
+
 def LP(new_value, prev_value, filter_constant):
     global time_step
     return time_step / max(filter_constant, time_step) * (new_value - prev_value) + prev_value
@@ -151,30 +160,14 @@ def get_road_load(road_gradient, speed):
     rolling_resistance_force = 300
     return air_resistance_force + rolling_resistance_force + road_gradient_force
 
-"""
-def get_driver_force(speed, road_load, speed_max, speed_min):
-    global driver_propotional_gain
-    global driver_integral_gain
-    global driver_integral
-    if speed_max == speed_min:
-        force = road_load
-    elif speed > speed_max:
-        driver_integral += driver_integral_gain * (speed_max - speed)
-        force = driver_integral + driver_propotional_gain * (speed_max - speed)
-    elif speed < speed_min:
-        driver_integral += driver_integral_gain * (speed_min - speed)
-        force = driver_integral + driver_propotional_gain * (speed_min - speed)
-    else:
-        driver_integral = max(0, abs(driver_integral)) - 1 * np.sign(driver_integral)
-        force = driver_integral
-    return force
-"""
-
 def get_driver_force(speed, road_load, speed_max, speed_min, prev_force):
     global driver_integral
     global driver_integral_gain
     global driver_propotional_gain
     global driver_force_filt_const
+
+    max_force = get_max_force(speed)
+    min_force = get_min_force(speed)
 
     if speed <= speed_min:
         force = road_load + driver_propotional_gain * (speed_min - speed)
@@ -183,7 +176,7 @@ def get_driver_force(speed, road_load, speed_max, speed_min, prev_force):
     else:
         force = 0
     force_filt = LP(force, prev_force, driver_force_filt_const)
-    return force_filt
+    return max(min(force_filt, max_force), min_force)
 
 
 def get_machine_power(speed, driver_force):
@@ -242,11 +235,11 @@ while distance < max_distance and time < max_time and speed > 0.1:
         switching_power = switch_loss
     else:
         switching_power = 0
+    battery_power = max(machine_power + switching_power, min_battery_power)     # Friction fillin braking assumed
     
     # Energy
     machine_energy += (machine_power + switching_power) * time_step
     switching_energy += switching_power * time_step
-    battery_power = machine_power + switching_power
     battery_energy += battery_power * time_step
 
     # Vehicle movement

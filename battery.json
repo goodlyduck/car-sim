@@ -1,6 +1,7 @@
 {
     "HVBATT1": {
-        "max_power": 400,
+        "max_power": 1000,
+        "min_power": -150,
         "internal_resistance": 0.0005
     }
 }

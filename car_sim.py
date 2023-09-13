@@ -5,15 +5,21 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import json
 from scipy.interpolate import interp1d
+import os
+import glob
 
 ############################################
 # Select vehicle, environment and scenario
 ############################################
-vehicle = "XC40"
+config_selection = {"vehicle": "XC40",
+                    "environment": "flat",
+                    "simulation": "stop_brake_early",
+                    "battery": "HVBATT1",
+                    "machine": "PM"
+                    }
+
 # environment = "flat_downhill_flat"
 # environment = "flat_downhill_uphill_flat"
-environment = "flat"
-simulation = "stop_brake_early"
 # simulation = "stop_brake_late"
 # simulation = "constant_speed_low_speed"
 # simulation = "allow_overshoot"
@@ -38,6 +44,22 @@ driver_propotional_gain = 10000
 ############################################
 # Open and read config files
 ############################################
+script_dir = os.path.dirname(os.path.abspath(__file__))
+config_files = glob.glob(os.path.join(script_dir, "*.json"))
+config_data = {}
+
+for file_path in config_files:
+    # Extract the filename without the extension
+    file_name = os.path.splitext(os.path.basename(file_path))[0]
+
+    # Read the JSON data from the file
+    with open(file_path, 'r') as json_file:
+        data = json.load(json_file).get(config_selection[file_name])
+
+    # Store the JSON data in the dictionary
+    config_data[file_name] = data
+
+"""
 p = Path(__file__).with_name("vehicles.json")
 with p.open("r") as f:
     vehicle_config = json.load(f).get(vehicle)
@@ -47,16 +69,13 @@ with p.open("r") as f:
 p = Path(__file__).with_name("environments.json")
 with p.open("r") as f:
     environment_config = json.load(f).get(environment)
+"""
 
 ############################################
 # Assign parameters from config
 ############################################
-road_gradient_profile_distance = environment_config[
-    "road_gradient_profile_distance"
-]  # km
-road_gradient_profile = environment_config[
-    "road_gradient_profile"
-]  # degrees, positive is uphill
+road_gradient_profile_distance = config_data["environment"]["road_gradient_profile_distance"]  # km
+road_gradient_profile = config_data["environment"]["road_gradient_profile"]  # degrees, positive is uphill
 road_gradient_function = interp1d(
     road_gradient_profile_distance,
     road_gradient_profile,
@@ -64,24 +83,24 @@ road_gradient_function = interp1d(
     fill_value="extrapolate",
 )
 
-mass = vehicle_config["mass"]
-drag_coefficient = vehicle_config["drag_coefficient"]
-frontal_area = vehicle_config["frontal_area"]
-machine_efficiency = vehicle_config["machine_efficiency"]
-switch_loss = vehicle_config["switch_loss"]  # W
+mass = config_data["vehicle"]["mass"]
+drag_coefficient = config_data["vehicle"]["drag_coefficient"]
+frontal_area = config_data["vehicle"]["frontal_area"]
+machine_efficiency = config_data["machine"]["efficiency"]
+switch_loss = config_data["machine"]["switch_loss"]  # W
 
 max_distance = min(
-    simulation_config["max_distance"] * 1000, road_gradient_profile_distance[-1] * 1000
+    config_data["simulation"]["max_distance"] * 1000, road_gradient_profile_distance[-1] * 1000
 )
-max_time = simulation_config["max_time"]
-initial_speed = simulation_config["initial_speed"] / 3.6
+max_time = config_data["simulation"]["max_time"]
+initial_speed = config_data["simulation"]["initial_speed"] / 3.6
 
-min_speed_profile = simulation_config["min_speed"]
-min_speed_distance = simulation_config["min_speed_distance"]    #km 
+min_speed_profile = config_data["simulation"]["min_speed"]
+min_speed_distance = config_data["simulation"]["min_speed_distance"]    #km 
 if isinstance(min_speed_profile,(list)):
     min_speed_function = interp1d(
-        simulation_config["min_speed_distance"],    #km
-        simulation_config["min_speed"],
+        config_data["simulation"]["min_speed_distance"],    #km
+        config_data["simulation"]["min_speed"],
         kind="linear",
         fill_value="extrapolate",
     )
@@ -89,8 +108,8 @@ else:
     def min_speed_function(x):
         return np.array(min_speed_profile)
 
-max_speed_profile = simulation_config["max_speed"]
-max_speed_distance = simulation_config["max_speed_distance"]    #km
+max_speed_profile = config_data["simulation"]["max_speed"]
+max_speed_distance = config_data["simulation"]["max_speed_distance"]    #km
 if isinstance(max_speed_profile,(list)):
     max_speed_function = interp1d(
         max_speed_distance,
@@ -344,7 +363,8 @@ plt.savefig(p)
 
 p = Path(__file__).with_name(date_time_string + ".txt")
 with open(p, 'w') as file:
-    file.write(result_string + "\n" + vehicle + "\n" + simulation + "\n" + environment + "\n")
+    file.write(result_string + "\n" + config_selection["vehicle"] + 
+               "\n" + config_selection["simulation"] + "\n" + config_selection["environment"] + "\n")
 
 ############################################
 # Show plot

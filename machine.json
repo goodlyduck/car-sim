@@ -1,0 +1,8 @@
+{
+    "PM": {
+        "max_torque": 400,
+        "max_power": 400,
+        "efficiency": 0.9,
+        "switch_loss": 300
+    }
+}

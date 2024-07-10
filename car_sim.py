@@ -18,8 +18,8 @@ import glob
 ############################################
 config_selection = {"vehicle": "XC40",
                     "environment": "flat_downhill_uphill_flat",
-                    "simulation": "constant_speed",
-                    #"simulation": "allow_overshoot",
+                    #"simulation": "constant_speed",
+                    "simulation": "allow_overshoot",
                     "battery": "HVBATT1",
                     "machine": "PM"
                     }
@@ -68,7 +68,7 @@ for file_path in config_files:
 ############################################
 # Assign parameters from config
 ############################################
-road_gradient_profile_distance = config_data["environment"]["road_gradient_profile_distance"]  # km
+road_gradient_profile_distance = config_data["environment"]["road_gradient_profile_distance_km"]  # km
 road_gradient_profile = config_data["environment"]["road_gradient_profile"]  # degrees, positive is uphill
 road_gradient_function = interp1d(
     road_gradient_profile_distance,
@@ -86,20 +86,20 @@ wheel_radius = config_data["vehicle"]["wheel_radius"]
 wheel_circm = wheel_radius * 2 * np.pi
 gear_ratio = config_data["machine"]["gear_ratio"]
 max_machine_torque = config_data["machine"]["max_torque"]
-max_machine_mech_power = config_data["machine"]["max_mech_power"] * 1000    # W
+max_machine_mech_power = config_data["machine"]["max_mech_power_kw"] * 1000    # W
 min_machine_torque = config_data["machine"]["min_torque"]
-min_machine_mech_power = config_data["machine"]["min_mech_power"] * 1000    # W
-max_battery_power = config_data["battery"]["max_power"] * 1000    # W
-min_battery_power = config_data["battery"]["min_power"] * 1000    # W
+min_machine_mech_power = config_data["machine"]["min_mech_power_kw"] * 1000    # W
+max_battery_power = config_data["battery"]["max_power_kw"] * 1000    # W
+min_battery_power = config_data["battery"]["min_power_kw"] * 1000    # W
 
 max_distance = min(
-    config_data["simulation"]["max_distance"] * 1000, road_gradient_profile_distance[-1] * 1000
+    config_data["simulation"]["max_distance_km"] * 1000, road_gradient_profile_distance[-1] * 1000
 )
 max_time = config_data["simulation"]["max_time"]
-initial_speed = config_data["simulation"]["initial_speed"] / 3.6
+initial_speed = config_data["simulation"]["initial_speed_kph"] / 3.6
 
-min_speed_profile = config_data["simulation"]["min_speed"] / 3.6
-min_speed_distance = config_data["simulation"]["min_speed_distance"]    #km 
+min_speed_profile = config_data["simulation"]["min_speed_kph"] / 3.6
+min_speed_distance = config_data["simulation"]["min_speed_distance_km"]    #km 
 if isinstance(min_speed_profile,(list)):
     min_speed_function = interp1d(
         min_speed_distance,
@@ -111,8 +111,8 @@ else:
     def min_speed_function(x):
         return np.array(min_speed_profile)
 
-max_speed_profile = config_data["simulation"]["max_speed"] / 3.6
-max_speed_distance = config_data["simulation"]["max_speed_distance"]    #km
+max_speed_profile = config_data["simulation"]["max_speed_kph"] / 3.6
+max_speed_distance = config_data["simulation"]["max_speed_distance_km"]    #km
 if isinstance(max_speed_profile,(list)):
     max_speed_function = interp1d(
         max_speed_distance,

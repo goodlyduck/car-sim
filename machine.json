@@ -2,8 +2,8 @@
     "PM": {
         "max_torque": 400,
         "min_torque": -400,
-        "max_mech_power": 400,
-        "min_mech_power": -400,
+        "max_mech_power_kw": 400,
+        "min_mech_power_kw": -400,
         "efficiency": 0.9,
         "switch_loss": 300,
         "gear_ratio": 8.77

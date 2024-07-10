@@ -1,6 +1,6 @@
 {
     "flat_downhill_flat": {
-        "road_gradient_profile_distance": [
+        "road_gradient_profile_distance_km": [
             0,
             0.99,
             1,
@@ -18,7 +18,7 @@
         ]
     },
     "flat_downhill_uphill_flat": {
-        "road_gradient_profile_distance": [
+        "road_gradient_profile_distance_km": [
             0,
             0.49,
             0.5,
@@ -40,7 +40,7 @@
         ]
     },
     "flat": {
-        "road_gradient_profile_distance": [
+        "road_gradient_profile_distance_km": [
             0,
             2
         ],

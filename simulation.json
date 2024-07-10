@@ -2,10 +2,10 @@
     "constant_speed": {
         "max_distance": 3000,
         "max_time": 10000,
-        "initial_speed": 25,
-        "min_speed": 25,
+        "initial_speed": 90,
+        "min_speed": 90,
         "min_speed_distance": 0,
-        "max_speed": 25,
+        "max_speed": 90,
         "max_speed_distance": 0
     },
     "constant_speed_low_speed": {
@@ -20,10 +20,10 @@
     "allow_overshoot": {
         "max_distance": 3000,
         "max_time": 10000,
-        "initial_speed": 25,
-        "min_speed": 25,
+        "initial_speed": 90,
+        "min_speed": 90,
         "min_speed_distance": 0,
-        "max_speed": 35,
+        "max_speed": 93,
         "max_speed_distance": 0
     },
     "allow_small_overshoot": {

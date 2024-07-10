@@ -9,11 +9,17 @@ import os
 import glob
 
 ############################################
+# README
+############################################
+# Config file units are km, kW and kph
+
+############################################
 # Select vehicle, environment and scenario
 ############################################
 config_selection = {"vehicle": "XC40",
-                    "environment": "flat",
-                    "simulation": "stop_brake_early",
+                    "environment": "flat_downhill_uphill_flat",
+                    "simulation": "constant_speed",
+                    #"simulation": "allow_overshoot",
                     "battery": "HVBATT1",
                     "machine": "PM"
                     }
@@ -29,9 +35,9 @@ config_selection = {"vehicle": "XC40",
 ############################################
 # Global constants
 ############################################
-gravity = 9.81
-time_step = 0.01
-driver_force_filt_const = 0.05
+GRAVITY = 9.81
+TIME_STEP = 0.01
+DRIVER_FORCE_FILT_CONST = 0.05
 
 ############################################
 # Global variables
@@ -92,12 +98,12 @@ max_distance = min(
 max_time = config_data["simulation"]["max_time"]
 initial_speed = config_data["simulation"]["initial_speed"] / 3.6
 
-min_speed_profile = config_data["simulation"]["min_speed"]
+min_speed_profile = config_data["simulation"]["min_speed"] / 3.6
 min_speed_distance = config_data["simulation"]["min_speed_distance"]    #km 
 if isinstance(min_speed_profile,(list)):
     min_speed_function = interp1d(
-        config_data["simulation"]["min_speed_distance"],    #km
-        config_data["simulation"]["min_speed"],
+        min_speed_distance,
+        min_speed_profile,
         kind="linear",
         fill_value="extrapolate",
     )
@@ -105,7 +111,7 @@ else:
     def min_speed_function(x):
         return np.array(min_speed_profile)
 
-max_speed_profile = config_data["simulation"]["max_speed"]
+max_speed_profile = config_data["simulation"]["max_speed"] / 3.6
 max_speed_distance = config_data["simulation"]["max_speed_distance"]    #km
 if isinstance(max_speed_profile,(list)):
     max_speed_function = interp1d(
@@ -124,19 +130,19 @@ else:
 ############################################
 def get_max_force(speed):
     # Add battery power here later (with machine efficiency)
-    max_wheel_torque = min(max_machine_torque * gear_ratio, max_machine_mech_power / (speed / wheel_circm * np.pi))
-    max_force = max_wheel_torque / wheel_radius
+    maxheel_torque = min(max_machine_torque * gear_ratio, max_machine_mech_power / (speed / wheel_circm * np.pi))
+    max_force = maxheel_torque / wheel_radius
     return max_force
 
 def get_min_force(speed):
     # Add battery power here later (with machine efficiency)
-    min_wheel_torque = max(min_machine_torque * gear_ratio, min_machine_mech_power / (speed / wheel_circm * np.pi))
-    min_force = min_wheel_torque / wheel_radius
+    minheel_torque = max(min_machine_torque * gear_ratio, min_machine_mech_power / (speed / wheel_circm * np.pi))
+    min_force = minheel_torque / wheel_radius
     return min_force
 
 def LP(new_value, prev_value, filter_constant):
-    global time_step
-    return time_step / max(filter_constant, time_step) * (new_value - prev_value) + prev_value
+    global TIME_STEP
+    return TIME_STEP / max(filter_constant, TIME_STEP) * (new_value - prev_value) + prev_value
 
 def get_road_gradient(distance):
     """
@@ -145,10 +151,10 @@ def get_road_gradient(distance):
     return road_gradient_function(distance / 1000).item()
 
 def get_max_speed(distance):
-    return max_speed_function(distance/1000).item() / 3.6
+    return max_speed_function(distance/1000).item()
 
 def get_min_speed(distance):
-    return min_speed_function(distance/1000).item() / 3.6
+    return min_speed_function(distance/1000).item()
 
 def get_road_load(road_gradient, speed):
     """
@@ -156,7 +162,7 @@ def get_road_load(road_gradient, speed):
     Input: distance (m) and speed (m/s)
     """
     air_resistance_force = 0.5 * drag_coefficient * frontal_area * speed**2
-    road_gradient_force = mass * gravity * np.sin(road_gradient * np.pi / 180)
+    road_gradient_force = mass * GRAVITY * np.sin(road_gradient * np.pi / 180)
     rolling_resistance_force = 300
     return air_resistance_force + rolling_resistance_force + road_gradient_force
 
@@ -164,7 +170,7 @@ def get_driver_force(speed, road_load, speed_max, speed_min, prev_force):
     global driver_integral
     global driver_integral_gain
     global driver_propotional_gain
-    global driver_force_filt_const
+    global DRIVER_FORCE_FILT_CONST
 
     max_force = get_max_force(speed)
     min_force = get_min_force(speed)
@@ -175,7 +181,7 @@ def get_driver_force(speed, road_load, speed_max, speed_min, prev_force):
         force = road_load + driver_propotional_gain * (speed_max - speed)
     else:
         force = 0
-    force_filt = LP(force, prev_force, driver_force_filt_const)
+    force_filt = LP(force, prev_force, DRIVER_FORCE_FILT_CONST)
     return max(min(force_filt, max_force), min_force)
 
 
@@ -200,9 +206,9 @@ elevation = 0
 battery_power = 0
 battery_energy = 0
 
-speeds = []
-max_speeds = []
-min_speeds = []
+speeds_kph = []
+max_speeds_kph = []
+min_speeds_kph = []
 battery_energies = []
 distances = []
 times = []
@@ -238,26 +244,26 @@ while distance < max_distance and time < max_time and speed > 0.1:
     battery_power = max(machine_power + switching_power, min_battery_power)     # Friction fillin braking assumed
 
     # Energy
-    machine_energy += (machine_power + switching_power) * time_step
-    switching_energy += switching_power * time_step
-    battery_energy += battery_power * time_step
+    machine_energy += (machine_power + switching_power) * TIME_STEP
+    switching_energy += switching_power * TIME_STEP
+    battery_energy += battery_power * TIME_STEP
 
     # Vehicle movement
     acceleration = net_force / mass
-    speed += acceleration * time_step
-    distance_step = speed * time_step
+    speed += acceleration * TIME_STEP
+    distance_step = speed * TIME_STEP
     distance += distance_step
 
-    time += time_step
+    time += TIME_STEP
 
-    elevation += np.arctan(road_gradient * np.pi / 180) * speed * time_step
+    elevation += np.arctan(road_gradient * np.pi / 180) * speed * TIME_STEP
 
     if elevation < -1:
         hej = "debug"
 
-    speeds.append(speed * 3.6)
-    max_speeds.append(max_speed * 3.6)
-    min_speeds.append(min_speed * 3.6)
+    speeds_kph.append(speed * 3.6)
+    max_speeds_kph.append(max_speed * 3.6)
+    min_speeds_kph.append(min_speed * 3.6)
     battery_powers.append(battery_power)
     battery_energies.append(battery_energy)
     distances.append(distance)
@@ -297,9 +303,9 @@ plt.ylabel("Road Gradient (deg)")
 plt.grid()
 
 plt.subplot(4, 3, 2)
-plt.plot(times, speeds)
-plt.plot(times, max_speeds, linestyle='--')
-plt.plot(times, min_speeds, linestyle='--')
+plt.plot(times, speeds_kph)
+plt.plot(times, max_speeds_kph, linestyle='--')
+plt.plot(times, min_speeds_kph, linestyle='--')
 plt.xlabel("Time (s)")
 plt.ylabel("vehicle Speed (km/h)")
 plt.grid()
@@ -308,6 +314,7 @@ plt.subplot(4, 3, 3)
 plt.plot(times, battery_energies_plot)
 plt.xlabel("Time (s)")
 plt.ylabel("Battery Energy (kWh)")
+plt.title(str(battery_energies_plot[-1]))
 plt.grid()
 
 plt.subplot(4, 3, 4)
@@ -345,6 +352,12 @@ plt.plot(times, battery_powers_plot)
 plt.xlabel("Time (s)")
 plt.ylabel("Battery Power (kW)")
 plt.grid()
+
+plt.subplot(4, 3, 10)
+text_lines = [f"{key}: {value}" for key, value in config_selection.items()]
+text = '\n'.join(text_lines)
+plt.text(0.5, 0.5, text, fontsize=12, va='center', ha='center', wrap=True)
+plt.axis('off')
 
 plt.tight_layout()
 

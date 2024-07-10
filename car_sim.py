@@ -18,8 +18,12 @@ import glob
 ############################################
 config_selection = {"vehicle": "XC40",
                     "environment": "flat_downhill_uphill_flat",
-                    "simulation": "constant_speed",
+                    #"simulation": "constant_speed",
+                    #"simulation": "constant_speed_low_speed",
                     #"simulation": "allow_overshoot",
+                    #"simulation": "allow_small_overshoot",
+                    "simulation": "allow_small_overshoot_low_speed",
+                    #"simulation": "allow_overshoot_low_speed",
                     "battery": "HVBATT1",
                     "machine": "PM"
                     }

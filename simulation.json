@@ -11,10 +11,10 @@
     "constant_speed_low_speed": {
         "max_distance_km": 3000,
         "max_time": 10000,
-        "initial_speed_kph": 5,
-        "min_speed_kph": 5,
+        "initial_speed_kph": 25,
+        "min_speed_kph": 25,
         "min_speed_distance_km": 0,
-        "max_speed_kph": 5,
+        "max_speed_kph": 25,
         "max_speed_distance_km": 0
     },
     "allow_overshoot": {
@@ -23,25 +23,34 @@
         "initial_speed_kph": 90,
         "min_speed_kph": 90,
         "min_speed_distance_km": 0,
-        "max_speed_kph": 93,
+        "max_speed_kph": 300,
         "max_speed_distance_km": 0
     },
-    "allow_small_overshoot": {
+    "allow_overshoot_low_speed": {
         "max_distance_km": 3000,
         "max_time": 10000,
         "initial_speed_kph": 25,
         "min_speed_kph": 25,
         "min_speed_distance_km": 0,
-        "max_speed_kph": 26,
+        "max_speed_kph": 300,
+        "max_speed_distance_km": 0
+    },
+    "allow_small_overshoot": {
+        "max_distance_km": 3000,
+        "max_time": 10000,
+        "initial_speed_kph": 90,
+        "min_speed_kph": 90,
+        "min_speed_distance_km": 0,
+        "max_speed_kph": 93,
         "max_speed_distance_km": 0
     },
     "allow_small_overshoot_low_speed": {
         "max_distance_km": 3000,
         "max_time": 10000,
-        "initial_speed_kph": 5,
-        "min_speed_kph": 5,
+        "initial_speed_kph": 25,
+        "min_speed_kph": 25,
         "min_speed_distance_km": 0,
-        "max_speed_kph": 7,
+        "max_speed_kph": 28,
         "max_speed_distance_km": 0
     },
     "stop_brake_early": {

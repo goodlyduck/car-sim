@@ -18,8 +18,8 @@ import glob
 ############################################
 config_selection = {"vehicle": "XC40",
                     "environment": "flat_downhill_uphill_flat",
-                    #"simulation": "constant_speed",
-                    "simulation": "allow_overshoot",
+                    "simulation": "constant_speed",
+                    #"simulation": "allow_overshoot",
                     "battery": "HVBATT1",
                     "machine": "PM"
                     }
@@ -287,10 +287,10 @@ battery_energies_plot = [x / (3600 * 1000) for x in battery_energies]   # J -> k
 battery_powers_plot = [x / 1000 for x in battery_powers]    # W -> kW
 switching_energies = np.array(switching_energies) / (3600 * 1000)  # J -> kWh
 
-average_speed = (distances[-1] / 1000) / (times[-1] / 3600)
+average_speed_kph = (distances[-1] / 1000) / (times[-1] / 3600)
 
 result_string = "Battery energy consumption: " + str(battery_energies_plot[-1]) + " kWh"
-average_speed_string = "Average speed: " + str(average_speed * 3.6) + " km/h"
+average_speed_string = "Average speed: " + str(average_speed_kph) + " km/h"
 print(average_speed_string)
 print(result_string)
 
@@ -308,13 +308,14 @@ plt.plot(times, max_speeds_kph, linestyle='--')
 plt.plot(times, min_speeds_kph, linestyle='--')
 plt.xlabel("Time (s)")
 plt.ylabel("vehicle Speed (km/h)")
+plt.title(average_speed_string)
 plt.grid()
 
 plt.subplot(4, 3, 3)
 plt.plot(times, battery_energies_plot)
 plt.xlabel("Time (s)")
 plt.ylabel("Battery Energy (kWh)")
-plt.title(str(battery_energies_plot[-1]))
+plt.title("Total: " + str(battery_energies_plot[-1]))
 plt.grid()
 
 plt.subplot(4, 3, 4)
